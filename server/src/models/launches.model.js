@@ -1,6 +1,11 @@
+const launchesDatabase = require('./launches.mongo');
+const planets = require('./planets.mongo');
+
+const DEFAULT_FLIGHT_NUMBER = 100;
+
 const launches = new Map();
 
-let latestFlightNumber = 100;
+
 
 const launch = {
     flightNumber: 100,
@@ -8,44 +13,83 @@ const launch = {
     rocket: 'Explorer IS1',
     launchDate: new Date('December 27, 2030'),
     target: 'Kepler-442 b',
-    customer: ['ZTM', 'NASA'],
+    customers: ['ZTM', 'NASA'],
     upcoming: true,
     success: true,
 }
 
-launches.set(launch.flightNumber, launch);
+saveLaunch(launch);
 
-function existLaunchWithId(launchId) {
-    return launches.has(launchId);
+async function existLaunchWithId(launchId) {
+    return await launchesDatabase.findOne({
+        flightNumber: launchId,
+    });
 }
 
-function getAllLaunches() {
-    return Array.from(launches.values());
+async function getLatestFlightNumber() {
+    // the - minus in front of the field name specify a sort descending.
+    const latestLaunch = await launchesDatabase.findOne().sort('-flightNumber');
+
+    if (!latestLaunch) {
+        return DEFAULT_FLIGHT_NUMBER;
+    }
+
+    return latestLaunch.flightNumber;    
 }
 
-function addNewLaunch(launch) {
-    latestFlightNumber++;
-    launches.set(
-        latestFlightNumber, Object.assign(launch, {
-            customers: ['Winvasion', 'Nasa'],
-            flightNumber: latestFlightNumber,
-            upcoming: true,
-            success: true,
-        })
-    );
+async function getAllLaunches() {
+    return await launchesDatabase.find({}, { '_id': 0, '__v': 0 });
 }
 
-function abortLaunchById(launchId) {
-    const aborted = launches.get(launchId);
-    aborted.upcoming = false;
-    aborted.success = false;
+async function saveLaunch(launch) {
 
-    return aborted;
+    const planet = await planets.findOne({
+        keplerName: launch.target,
+    });
+
+    if (!planet) {
+        throw new Error('No matching planets found.');
+    }
+
+    //await launchesDatabase.updateOne({
+    //findOneAndUpdate will not include $setOnInsert in the response.
+    await launchesDatabase.findOneAndUpdate({
+        flightNumber: launch.flightNumber,
+    }, launch, {
+        upsert: true,
+    })
+}
+
+async function scheduleNewLaunch(launch) {
+    const newFlightNumber = await getLatestFlightNumber() + 1;
+
+    const newLaunch = Object.assign(launch, {
+        success: true,
+        upcoming: true,
+        customers: ['Winvasion', 'Nasa'],
+        flightNumber: newFlightNumber,
+    })
+
+    await saveLaunch(newLaunch);
+}
+
+async function abortLaunchById(launchId) {
+    const aborted = await launchesDatabase.updateOne({
+        flightNumber: launchId,
+    }, {
+        upcoming: false,
+        success: false,
+    });
+
+    // Find out about these value by analysing the return from updateOne.
+    //return aborted.ok === 1 && aborted.nModified === 1;
+    //Return for Mongoose version 6+
+    return aborted.modifiedCount === 1;
 }
 
 module.exports = {
     getAllLaunches,
-    addNewLaunch,
+    scheduleNewLaunch,
     existLaunchWithId,
     abortLaunchById,
 };

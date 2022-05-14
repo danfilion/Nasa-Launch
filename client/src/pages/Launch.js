@@ -14,6 +14,7 @@ const Launch = props => {
   return <Appear id="launch" animate show={props.entered}>
     <Paragraph>Schedule a mission launch for interstellar travel to one of the Kepler Exoplanets.</Paragraph>
     <Paragraph>Only confirmed planets matching the following criteria are available for the earliest scheduled missions:</Paragraph>
+    <div><simple-greeting name="World of Dada Famous"></simple-greeting></div>
     <ul>
       <li>Planetary radius &lt; 1.6 times Earth's radius</li>
       <li>Effective stellar flux &gt; 0.36 times Earth's value and &lt; 1.11 times Earth's value</li>
